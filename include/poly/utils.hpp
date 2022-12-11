@@ -10,7 +10,6 @@
 
 namespace poly::utils {
 
-
 template<class T, class T_variant>
 struct variant_can_hold_t;
 
