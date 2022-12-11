@@ -8,7 +8,6 @@
 
 namespace poly {
 
-
 struct data_conversion_error : public std::runtime_error {
     const data &source;
 
@@ -18,12 +17,22 @@ struct data_conversion_error : public std::runtime_error {
         {  }
 };
 
-class data : public std::variant<null, string, integer, real, boolean, array, object> {
+class data : 
+    public std::variant<null, integer, real, boolean, string_ptr, array_ptr, object_ptr> 
+{
+
 public:
     using variant::variant;
     using variant::operator=;
 
+    data(null) noexcept;
     data(integer value) noexcept;
+    data(const string &value);
+    
+    template<std::size_t Size> 
+    data(const char (& value)[Size]) : 
+        variant { std::make_shared<string>(value, Size) }
+        {  }
 
     property operator[](const index_type &index);
 
@@ -39,9 +48,13 @@ public:
     template<class T>
     inline bool is_a() const noexcept { 
         static_assert(can_hold<T>(), "Value cannot ever be the requested type.");
-        return std::holds_alternative<T>(*this); 
+        if constexpr(is_scalar<T>()) {
+            return std::holds_alternative<T>(*this);
+        } else {
+            return std::holds_alternative<std::shared_ptr<T>>(*this); 
+        }
     }
-
+ 
     template<class T>
     inline T &as() {
         if(!is_a<T>()) {
@@ -51,12 +64,18 @@ public:
             std::string to { utils::type_name<T>() };
             throw data_conversion_error { *this, from, to };
         }
-        return std::get<T>(*this);
+
+        if constexpr(is_scalar<T>()) {
+            return std::get<T>(*this);
+        } else {
+            return *std::get<std::shared_ptr<T>>(*this);
+        }
     }
 
     template<class T>
     static inline constexpr bool can_hold() noexcept {
-        return utils::variant_can_hold_v<T, variant>;
+        return utils::variant_can_hold_v<T, variant> ||
+            utils::variant_can_hold_v<std::shared_ptr<T>, variant>;
     }
 
 private:
@@ -66,11 +85,11 @@ private:
 };
 
 inline data make_object(std::initializer_list<object::value_type> args = {}) {
-    return object { std::begin(args), std::end(args) };
+    return std::make_shared<object>(std::begin(args), std::end(args));
 }
 
 inline data make_array(std::initializer_list<array::value_type> args = {}) {
-    return array { std::begin(args), std::end(args) };
+    return std::make_shared<array>(std::begin(args), std::end(args));
 }
 
 } /* namespace poly */

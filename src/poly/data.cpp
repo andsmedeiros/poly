@@ -2,8 +2,16 @@
 
 namespace poly {
 
-data::data(integer value) noexcept:
+data::data(integer value) noexcept :
     variant { value }
+    {  }
+
+data::data(const string &value) :
+    variant { std::make_shared<string>(value) }
+    {  }
+
+data::data(null) noexcept:
+    variant { null {  } }
     {  }
 
 property data::operator[](const index_type &index) {
